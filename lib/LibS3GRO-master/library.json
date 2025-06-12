@@ -1,0 +1,24 @@
+{
+    "name":"LibS3GRO",
+    "description":"Library for Université de Sherbrooke S3 Robotic project",
+    "authors":
+    [
+      {
+        "name": "Jean-Samuel Lauzon",
+        "maintainer": true
+      }
+  
+    ],
+    "dependencies":
+    [
+      {"name": "Adafruit INA219"},
+	    {"name": "SoftwareSerial"},
+      {"name": "ArduinoJson"},
+      {"name": "Grove IMU 9DOF"},
+      {
+        "name": "Seeed ICM20600",
+        "version": "https://github.com/Seeed-Studio/Seeed_ICM20600_AK09918.git"
+      }
+    ],
+    "version": "1.0.5"
+  }
