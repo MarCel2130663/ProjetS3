@@ -1,27 +1,36 @@
 #include <Arduino.h>
 #include <LibS3GRO.h>
-#include "PID.h"
+#include "PIDurmom.h"
 
 int MAGPIN = 2; //pin electroaimant
 int POTPIN = 0; // pin potentiometre
+
+int REAR = 0;
+int FRONT = 1;
 
 uint8_t PWM_PIN_1 = 5;
 uint8_t DIR_PIN_1 = 30;
 uint8_t PWM_PIN_2 = 6;
 uint8_t DIR_PIN_2 = 31;
 ArduinoX AX;
-PID pid;
 float speed;
 
 //variables PID
-float kp = 50;
+float kp = 0.001;
 float ki = 0;
-float kd = 80;
-float setPoint = 9600;
-float currentPosition;
-long lastTime = 0;
+float kd = 0;
+int setPoint = 6000;
+int currentPosition;
 float output;
 
+PIDurmom pid(kp, ki, kd);
+
+void rouler(PIDurmom pid, float sp, float cp){
+  output = pid.calculate(sp, cp);
+  float speed = constrain(output, -1.0, 1.0);
+  //Serial.println(speed);
+  AX.setMotorPWM(REAR, speed);
+}
 
 void setup() {
   Serial.begin(9600);
@@ -42,18 +51,13 @@ void loop() {
   // int valeur = analogRead(POTPIN);
   // Serial.println(valeur);
 
-  speed = 0.5;
-  AX.setMotorPWM(PWM_PIN_1, speed);
+  currentPosition = AX.readEncoder(REAR);
+  Serial.println(currentPosition);
+  rouler(pid, setPoint, currentPosition);
 
-  currentPosition = AX.readEncoder(0);
-  rouler(setPoint, currentPosition);
-}
-
-void rouler(float sp, float cp){
-  long now = millis();
-  float dt = (now - lastTime) / 1000.0;
-  lastTime = now;
-  output = pid.calculate(sp, cp, dt);
-  int motorSpeed = ((constrain(abs(output), 0, 255) / 255.0) * 2.0) - 1.0;
-  AX.setMotorPWM(PWM_PIN_1, motorSpeed);
+  if(currentPosition == setPoint){
+    Serial.println("allo");
+    delay(3000);
+    AX.resetEncoder(0);
+  }
 }
