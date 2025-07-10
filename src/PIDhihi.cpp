@@ -1,7 +1,7 @@
-#include "PIDurmom.h"
+#include "PIDhihi.h"
 #include <Arduino.h>
 
-PIDurmom::PIDurmom(float p, float i, float d){
+PIDhihi::PIDhihi(float p, float i, float d){
     kp = p;
     ki = i;
     kd = d;
@@ -10,7 +10,7 @@ PIDurmom::PIDurmom(float p, float i, float d){
     lastTime = 0;
 }
 
-float PIDurmom::calculate(int setPoint, int currentPosition){
+float PIDhihi::calculate(int setPoint, int currentPosition){
     long now = millis();
     float dt = (now - lastTime) / 1000.0;
     lastTime = now;

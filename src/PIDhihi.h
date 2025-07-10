@@ -1,9 +1,9 @@
-#ifndef PIDURMOM_H
-#define PIDURMOM_H
+#ifndef PIDHIHI_H
+#define PIDHIHI_H
 
-class PIDurmom{
+class PIDhihi{
     public:
-        PIDurmom(float p, float i, float d);
+        PIDhihi(float p, float i, float d);
         float calculate(int setPoint, int currentPosition);
     private:
         float kp, ki, kd;
