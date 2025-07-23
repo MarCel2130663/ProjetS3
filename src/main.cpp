@@ -36,19 +36,20 @@ PIDhihi pid(kp, ki, kd);
 //VexQuadEncoder encoder;
 
 // POSITIONS CIBLES
-int debut = 2000;
-int obstacle1 = 5000;
+int debut = 2500;
+int obstacle1 = 5500;
 int obstacle2 = 12000;
 int fin = 15000;
 
 // ANGLES CIBLES
-int angleYeet = 900;
+int angleYeet = 810;
+int angleArriere = 720;
 
 bool vibing;
 
 float rouler(PIDhihi pid, float sp, float cp){
   output = pid.calculate(sp, cp);
-  float speed = constrain(output, -0.8, 0.8);
+  float speed = constrain(output, -0.55, 0.55);
   AX.setMotorPWM(FRONT, speed);
   AX.setMotorPWM(REAR, speed);
   return cp;
@@ -78,6 +79,7 @@ void loop() {
   delay(4000);
 
   while(START2){
+    vibing = true;
     // avancer la premiere fois jusqua obstacle1
     while(currentPosition < obstacle1){
       currentPosition = rouler(pid, obstacle1, AX.readEncoder(REAR));
@@ -89,25 +91,33 @@ void loop() {
       // reculer jusqua debut
       while(currentPosition > debut){
         currentPosition = rouler(pid, debut, AX.readEncoder(REAR));
-      }
-      arreter();
-      delay(100);
-
-      // avancer jusqua obstacle1
-      while(currentPosition < obstacle1){
-        currentPosition = rouler(pid, obstacle1, AX.readEncoder(REAR));
-        if(analogRead(POTPIN) >= angleYeet){
+        Serial.println(analogRead(POTPIN));
+        if(analogRead(POTPIN) <= angleArriere){
           // desactiver electroaimant
           Serial.println("Angle atteint");
-          digitalWrite(MAGPIN1, LOW);
-          digitalWrite(MAGPIN2, LOW);
-          START2 = false;
-          vibing = false;
+          // while(currentPosition < obstacle1){
+          //   currentPosition = rouler(pid, obstacle1, AX.readEncoder(REAR));
+          //   if(analogRead(POTPIN) >= angleArriere + 5){
+              delay(700);
+              digitalWrite(MAGPIN1, LOW);
+              digitalWrite(MAGPIN2, LOW);
+              delay(1000);
+              START2 = false;
+              vibing = false;
+          //   }
+          // }
         }
+      }
+      Serial.println("Retour au bout du rail");
+      while(currentPosition < obstacle1){
+        currentPosition = rouler(pid, obstacle1, AX.readEncoder(REAR));
       }
       arreter();
       delay(100);
     }
+  }
+  while(currentPosition < 0){
+    currentPosition = rouler(pid, 0, AX.readEncoder(REAR));
   }
   // attendre ui
   // else if(START1){
