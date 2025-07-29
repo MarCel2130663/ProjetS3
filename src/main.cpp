@@ -4,8 +4,7 @@
 #include "PIDhihi.h"
 
 //UI
-bool START1 = false; // utilisateur
-bool START2 = true; // yeet
+bool START = true; // utilisateur
 
 //PINS
 int POTPIN = 11; //potentiometre
@@ -36,14 +35,11 @@ PIDhihi pid(kp, ki, kd);
 //VexQuadEncoder encoder;
 
 // POSITIONS CIBLES
-int debut = 2500;
-int obstacle1 = 5500;
-int obstacle2 = 12000;
-int fin = 15000;
+int debut = 2700;
+int obstacle = 5700;
 
-// ANGLES CIBLES
-int angleYeet = 810;
-int angleArriere = 720;
+// ANGLE CIBLE
+int angleArriere = 730;
 
 bool vibing;
 
@@ -72,106 +68,56 @@ void setup() {
 }
 
 void loop() {
+  Serial.println("Debut loop");
+  AX.resetEncoder(REAR);
   //activer electroaimant
   digitalWrite(MAGPIN1, HIGH);
   digitalWrite(MAGPIN2, HIGH);
   // mettre sapin (a enlever quand on a le ui)
-  delay(4000);
+  delay(9000);
+  START = true;
 
-  while(START2){
+  while(START){
+    Serial.println("Debut START");
     vibing = true;
     // avancer la premiere fois jusqua obstacle1
-    while(currentPosition < obstacle1){
-      currentPosition = rouler(pid, obstacle1, AX.readEncoder(REAR));
+    while(currentPosition < obstacle){
+      currentPosition = rouler(pid, obstacle, AX.readEncoder(REAR));
     }
     arreter();
     delay(100);
 
     while(vibing){
       // reculer jusqua debut
-      while(currentPosition > debut){
+      Serial.println("Debut vibing");
+      while(currentPosition > debut && vibing){
         currentPosition = rouler(pid, debut, AX.readEncoder(REAR));
-        Serial.println(analogRead(POTPIN));
-        if(analogRead(POTPIN) <= angleArriere){
+        if(analogRead(POTPIN) <= angleArriere && vibing){
           // desactiver electroaimant
           Serial.println("Angle atteint");
-          // while(currentPosition < obstacle1){
-          //   currentPosition = rouler(pid, obstacle1, AX.readEncoder(REAR));
-          //   if(analogRead(POTPIN) >= angleArriere + 5){
-              delay(700);
-              digitalWrite(MAGPIN1, LOW);
-              digitalWrite(MAGPIN2, LOW);
-              delay(1000);
-              START2 = false;
-              vibing = false;
-          //   }
-          // }
+          while(currentPosition < obstacle && vibing){
+            currentPosition = rouler(pid, obstacle, AX.readEncoder(REAR));
+            Serial.println("Avance une derniere fois");
+            delay(700);
+            Serial.println("Lacher sapin");
+            digitalWrite(MAGPIN1, LOW);
+            digitalWrite(MAGPIN2, LOW);
+            delay(100);
+            Serial.println("Vibing false");
+            vibing = false;
+            START = false;
+          }
         }
       }
-      Serial.println("Retour au bout du rail");
-      while(currentPosition < obstacle1){
-        currentPosition = rouler(pid, obstacle1, AX.readEncoder(REAR));
+      while(currentPosition < obstacle && vibing){
+        currentPosition = rouler(pid, obstacle, AX.readEncoder(REAR));
       }
       arreter();
       delay(100);
     }
   }
-  while(currentPosition < 0){
+  Serial.println("Retour au bout du rail");
+  while(currentPosition > 0){
     currentPosition = rouler(pid, 0, AX.readEncoder(REAR));
   }
-  // attendre ui
-  // else if(START1){
-  //   // tant que angle > aller
-  //   while(digitalRead(POTPIN) > angleAller){
-  //       // avancer jusqua obstacle1
-  //       while(currentPosition < obstacle1){
-  //         currentPosition = rouler(pid, obstacle1, AX.readEncoder(REAR));
-  //       }
-  //       delay(200);
-  //       // reculer jusqua debut
-  //       while(currentPosition > debut){
-  //         currentPosition = rouler(pid, debut, AX.readEncoder(REAR));
-  //       }
-  //       delay(200);
-  //   }
-
-  //   // si angle <= aller
-  //   if(lirePot(POTPIN) <= angleAller){
-  //     // avancer at max speed jusqua fin
-  //     while(currentPosition < fin){
-  //       currentPosition = rouler(pid, fin, AX.readEncoder(REAR));
-  //     }
-  //     delay(200);
-  //   }
-
-  //   // si angle == depot
-  //   if(lirePot(POTPIN) == angleDepot){
-  //     //desactiver electroaimant
-  //     digitalWrite(MAGPIN1, LOW);
-  //     digitalWrite(MAGPIN2, LOW);
-  //   }
-
-  //   // tant que angle < angleRetour
-  //   while(lirePot(POTPIN) < angleRetour){
-  //     // reculer jusqua obstacle2
-  //     while(currentPosition > obstacle2){
-  //       currentPosition = rouler(pid, obstacle2, AX.readEncoder(REAR));
-  //     }
-  //     delay(200);
-  //     // avancer jusqua fin
-  //     while(currentPosition < fin){
-  //       currentPosition = rouler(pid, fin, AX.readEncoder(REAR));
-  //     }
-  //     delay(200);
-    // }
-
-    // //si angle >= angleRetour
-    // if(lirePot(POTPIN) >= angleRetour){
-    //   // reculer at max speed jusqua debut
-    //   while(currentPosition > debut){
-    //     currentPosition = rouler(pid, debut, AX.readEncoder(REAR));
-    //   }
-    //   delay(200);
-    // }
-  // }
 }
