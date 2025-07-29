@@ -1,10 +1,24 @@
 #include <Arduino.h>
 #include <LibS3GRO.h>
 #include <string.h>
+#include <ArduinoJson.h>
 #include "PIDhihi.h"
 
+// CONSTANTES
+#define UPDATE_PERIOD 100 // ms
+
 //UI
-bool START = true; // utilisateur
+bool START = false; // utilisateur
+bool STOP = false; // arret d'urgence
+float courant;
+float tension;
+float position;
+float pos_membre_all;
+volatile bool shouldRead_;
+volatile bool shouldSend_;
+SoftTimer timerSendMessage_;
+SoftTimer lightTimer_;
+int lightState_ = 0;
 
 //PINS
 int POTPIN = 11; //potentiometre
@@ -26,29 +40,121 @@ int FRONT = 1;
 float kp = 0.001;
 float ki = 0;
 float kd = 0;
+int lastPosition = 0;
 int currentPosition = 0;
 float output;
 
 // OBJETS
 ArduinoX AX;
 PIDhihi pid(kp, ki, kd);
-//VexQuadEncoder encoder;
 
 // POSITIONS CIBLES
-int debut = 2700;
-int obstacle = 5700;
+int home = 100;
+int debut = 3500;
+int obstacle = debut + 2200; // obstacle = debut + oscillation = 5700
 
 // ANGLE CIBLE
 int angleArriere = 730;
+int angleAvant = 810;
 
-bool vibing;
+bool oscille;
 
-float rouler(PIDhihi pid, float sp, float cp){
+void timerCallback(){shouldSend_ = true;}
+
+void serialEvent(){shouldRead_ = true;}
+
+void turnOnLight(){
+  digitalWrite(LED_BUILTIN, HIGH);
+  lightState_ = 1;
+}
+ 
+// Éteindre la lumière
+void turnOffLight(){
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(2000);
+  lightTimer_.disable();
+  lightState_ = 0;
+}
+
+void sendMessage(){
+  /* Envoi du message Json sur le port seriel */
+  StaticJsonDocument<500> doc;
+  
+  // Elements du message
+  doc["tension"] = tension;
+  doc["courant"] = courant;
+  doc["position"] = position;
+  doc["AngleYeet"] = pos_membre_all;
+  
+  // Serialisation
+  serializeJson(doc, Serial);
+  
+  // Envoi
+  Serial.println();
+  shouldSend_ = false;
+}
+
+void readMessage(){
+  // Lecture du message Json
+  StaticJsonDocument<500> doc;
+  JsonVariant parse_msg;
+ 
+  // Lecture sur le port Seriel
+  DeserializationError error = deserializeJson(doc, Serial);
+  shouldRead_ = false;
+ 
+  // Si erreur dans le message
+  if (error) {
+    Serial.print("deserialize() failed: ");
+    Serial.println(error.c_str());
+    return;
+  }
+ 
+  // Analyse des éléments du message message
+  // Si on doit allumer la lumière
+  parse_msg = doc["StartCode"];
+  if(!parse_msg.isNull()){
+    START = doc["StartCode"].as<int>();
+    turnOnLight();
+    lightTimer_.setDelay(10);
+    lightTimer_.enable();
+  }
+ 
+  parse_msg = doc["StopCode"];
+  if(!parse_msg.isNull()){
+    STOP = doc["StopCode"].as<int>();
+    turnOnLight();
+    lightTimer_.setDelay(20);
+    lightTimer_.enable();
+  }
+ 
+  // Si on doit faire un echo du message recu
+  parse_msg = doc["userMsg"];
+  if(!parse_msg.isNull()){
+    Serial.println(doc["userMsg"].as<String>());
+  }
+}
+
+void sendPosition(){
+  position += abs(currentPosition-lastPosition) * 0.44 / 3200;
+  lastPosition = currentPosition;
+}
+
+void rouler(PIDhihi pid, float sp, float cp){
   output = pid.calculate(sp, cp);
   float speed = constrain(output, -0.55, 0.55);
   AX.setMotorPWM(FRONT, speed);
   AX.setMotorPWM(REAR, speed);
-  return cp;
+
+  tension = AX.getVoltage();
+  courant = AX.getCurrent();
+  currentPosition = cp;
+  sendPosition();
+  pos_membre_all = analogRead(POTPIN)/(223/85)-305;
+  if(shouldSend_){
+    sendMessage();
+  }
+  timerSendMessage_.update();
 }
 
 void arreter(){
@@ -57,14 +163,21 @@ void arreter(){
 }
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
 
-  vibing = true;
+  oscille = true;
   pinMode(POTPIN, INPUT);
   pinMode(MAGPIN1, OUTPUT);
   pinMode(MAGPIN2, OUTPUT);
+  pinMode(LED_BUILTIN, OUTPUT);
   AX.init();
-  AX.resetEncoder(REAR);
+
+  timerSendMessage_.setDelay(UPDATE_PERIOD);
+  timerSendMessage_.setCallback(timerCallback);
+  timerSendMessage_.enable();
+
+  lightTimer_.setCallback(turnOffLight);
+  lightTimer_.disable();
 }
 
 void loop() {
@@ -73,51 +186,46 @@ void loop() {
   //activer electroaimant
   digitalWrite(MAGPIN1, HIGH);
   digitalWrite(MAGPIN2, HIGH);
-  // mettre sapin (a enlever quand on a le ui)
-  delay(9000);
-  START = true;
-
-  while(START){
-    Serial.println("Debut START");
-    vibing = true;
+  // mettre sapin
+  if(shouldRead_){
+    readMessage();
+  }
+  timerSendMessage_.update();
+  lightTimer_.update();
+  
+  while(START && !STOP){
+    Serial.println("Debut du cycle");
+    oscille = true;
     // avancer la premiere fois jusqua obstacle1
     while(currentPosition < obstacle){
-      currentPosition = rouler(pid, obstacle, AX.readEncoder(REAR));
+      rouler(pid, obstacle, AX.readEncoder(REAR));
     }
     arreter();
     delay(100);
-
-    while(vibing){
-      // reculer jusqua debut
-      Serial.println("Debut vibing");
-      while(currentPosition > debut && vibing){
-        currentPosition = rouler(pid, debut, AX.readEncoder(REAR));
-        if(analogRead(POTPIN) <= angleArriere && vibing){
-          // desactiver electroaimant
-          Serial.println("Angle atteint");
-          while(currentPosition < obstacle && vibing){
-            currentPosition = rouler(pid, obstacle, AX.readEncoder(REAR));
-            Serial.println("Avance une derniere fois");
-            delay(700);
+    // reculer jusqua debut
+    Serial.println("Reculer");
+    while(currentPosition > debut && oscille){
+      rouler(pid, debut, AX.readEncoder(REAR));
+      if(analogRead(POTPIN) <= angleArriere && oscille){
+        Serial.println("Angle arriere atteint");
+        while(currentPosition < obstacle && oscille){
+          rouler(pid, obstacle, AX.readEncoder(REAR));
+          if(analogRead(POTPIN) >= angleAvant && oscille){
             Serial.println("Lacher sapin");
+            // desactiver electroaimant
             digitalWrite(MAGPIN1, LOW);
             digitalWrite(MAGPIN2, LOW);
             delay(100);
-            Serial.println("Vibing false");
-            vibing = false;
+            Serial.println("Oscille false");
+            oscille = false;
             START = false;
           }
         }
       }
-      while(currentPosition < obstacle && vibing){
-        currentPosition = rouler(pid, obstacle, AX.readEncoder(REAR));
-      }
-      arreter();
-      delay(100);
     }
   }
   Serial.println("Retour au bout du rail");
-  while(currentPosition > 0){
-    currentPosition = rouler(pid, 0, AX.readEncoder(REAR));
+  while(currentPosition > home){
+    rouler(pid, 0, AX.readEncoder(REAR));
   }
 }
