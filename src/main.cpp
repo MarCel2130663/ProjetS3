@@ -9,7 +9,6 @@
 
 //UI
 bool START = false; // utilisateur
-bool STOP = false; // arret d'urgence
 float courant;
 float tension;
 float position;
@@ -49,7 +48,7 @@ ArduinoX AX;
 PIDhihi pid(kp, ki, kd);
 
 // POSITIONS CIBLES
-int home = 100;
+int home = 200;
 int debut = 3500;
 int obstacle = debut + 2200; // obstacle = debut + oscillation = 5700
 
@@ -120,14 +119,6 @@ void readMessage(){
     lightTimer_.enable();
   }
  
-  parse_msg = doc["StopCode"];
-  if(!parse_msg.isNull()){
-    STOP = doc["StopCode"].as<int>();
-    turnOnLight();
-    lightTimer_.setDelay(20);
-    lightTimer_.enable();
-  }
- 
   // Si on doit faire un echo du message recu
   parse_msg = doc["userMsg"];
   if(!parse_msg.isNull()){
@@ -142,7 +133,7 @@ void sendPosition(){
 
 void rouler(PIDhihi pid, float sp, float cp){
   output = pid.calculate(sp, cp);
-  float speed = constrain(output, -0.55, 0.55);
+  float speed = constrain(output, -0.57, 0.57);
   AX.setMotorPWM(FRONT, speed);
   AX.setMotorPWM(REAR, speed);
 
@@ -186,6 +177,11 @@ void loop() {
   //activer electroaimant
   digitalWrite(MAGPIN1, HIGH);
   digitalWrite(MAGPIN2, HIGH);
+
+  pos_membre_all = analogRead(POTPIN)/(223/85)-305;
+  if(shouldSend_){
+    sendMessage();
+  }
   // mettre sapin
   if(shouldRead_){
     readMessage();
@@ -193,7 +189,7 @@ void loop() {
   timerSendMessage_.update();
   lightTimer_.update();
   
-  while(START && !STOP){
+  while(START){
     Serial.println("Debut du cycle");
     oscille = true;
     // avancer la premiere fois jusqua obstacle1
@@ -226,6 +222,6 @@ void loop() {
   }
   Serial.println("Retour au bout du rail");
   while(currentPosition > home){
-    rouler(pid, 0, AX.readEncoder(REAR));
+    rouler(pid, home, AX.readEncoder(REAR));
   }
 }
