@@ -9,10 +9,11 @@
 
 //UI
 bool START = false; // utilisateur
-float courant;
-float tension;
-float position;
-float pos_membre_all;
+double courant;
+double tension;
+double position;
+double distance; // distance parcourue
+double pos_membre_all;
 volatile bool shouldRead_;
 volatile bool shouldSend_;
 SoftTimer timerSendMessage_;
@@ -48,15 +49,13 @@ ArduinoX AX;
 PIDhihi pid(kp, ki, kd);
 
 // POSITIONS CIBLES
-int home = 200;
-int debut = 3500;
-int obstacle = debut + 2200; // obstacle = debut + oscillation = 5700
+int home = 370;
+int debut = 3930;
+int obstacle = debut + 2200;
 
-// ANGLE CIBLE
+// ANGuLES CIBLES
 int angleArriere = 730;
-int angleAvant = 810;
-
-bool oscille;
+int angleAvant = 825; //820 = bon angle
 
 void timerCallback(){shouldSend_ = true;}
 
@@ -83,6 +82,7 @@ void sendMessage(){
   doc["tension"] = tension;
   doc["courant"] = courant;
   doc["position"] = position;
+  doc["distance"] = distance;
   doc["AngleYeet"] = pos_membre_all;
   
   // Serialisation
@@ -127,7 +127,8 @@ void readMessage(){
 }
 
 void sendPosition(){
-  position += abs(currentPosition-lastPosition) * 0.44 / 3200;
+  position = (currentPosition) * 0.44 / 3200;
+  distance += abs(currentPosition-lastPosition) * 0.44 / 3200;
   lastPosition = currentPosition;
 }
 
@@ -156,7 +157,6 @@ void arreter(){
 void setup() {
   Serial.begin(115200);
 
-  oscille = true;
   pinMode(POTPIN, INPUT);
   pinMode(MAGPIN1, OUTPUT);
   pinMode(MAGPIN2, OUTPUT);
@@ -191,7 +191,7 @@ void loop() {
   
   while(START){
     Serial.println("Debut du cycle");
-    oscille = true;
+    bool oscille = true;
     // avancer la premiere fois jusqua obstacle1
     while(currentPosition < obstacle){
       rouler(pid, obstacle, AX.readEncoder(REAR));
