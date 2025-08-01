@@ -55,8 +55,9 @@ int obstacle = debut + 2200;
 
 // ANGuLES CIBLES
 int angleArriere = 730;
-int angleAvant = 825; //820 = bon angle
+int angleAvant = 825;
 
+// FONCTIONS COMMUNICATION AVEC RPI
 void timerCallback(){shouldSend_ = true;}
 
 void serialEvent(){shouldRead_ = true;}
@@ -138,6 +139,7 @@ void rouler(PIDhihi pid, float sp, float cp){
   AX.setMotorPWM(FRONT, speed);
   AX.setMotorPWM(REAR, speed);
 
+  // envoi des infos au RPi
   tension = AX.getVoltage();
   courant = AX.getCurrent();
   currentPosition = cp;
